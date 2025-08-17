@@ -2,51 +2,31 @@ import streamlit as st
 import requests
 import json
 import uuid
+import re
 
 # --- Application Configuration ---
-# Use the model name specified by the user.
-# The `gemini-2.0-flash` model is an example of a valid model.
 MODEL_NAME = "gemini-2.0-flash"
 API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL_NAME}:generateContent"
 
-# A very simple, in-memory vector store simulation.
-# In a real application, you would use a proper vector database like Pinecone, Weaviate, or ChromaDB.
-# This dictionary stores known "anomalous" patterns and their associated context.
-# We'll use a unique ID for each stored pattern.
+# --- Simple in-memory vector database ---
 class SimpleVectorDB:
     def __init__(self):
         self.db = {}
 
     def add_pattern(self, pattern, explanation_context):
-        """Adds a new pattern and its context to the database."""
-        # For simplicity, we'll use a hash of the pattern as a pseudo-vector/key.
-        # In a real vector DB, 'pattern' would be an embedding vector.
         pattern_id = str(uuid.uuid4())
-        self.db[pattern_id] = {
-            "pattern": pattern,
-            "context": explanation_context
-        }
+        self.db[pattern_id] = {"pattern": pattern, "context": explanation_context}
         return pattern_id
 
     def find_similar(self, new_pattern, threshold=0.8):
-        """
-        Finds a similar pattern in the database.
-        
-        For this simple demo, similarity is a direct string match.
-        In a real application, this would be a vector similarity search (e.g., cosine similarity).
-        """
         for pattern_id, data in self.db.items():
             if data["pattern"] in new_pattern:
-                # This is a very basic "match"
-                # A real system would use vector similarity
                 return data["context"]
         return None
 
-# Initialize the simple in-memory database in Streamlit's session state
-# This ensures data persists across reruns.
+# Initialize vector DB in session state
 if 'vector_db' not in st.session_state:
     st.session_state.vector_db = SimpleVectorDB()
-    # Pre-populate with some known anomalous patterns for demonstration
     st.session_state.vector_db.add_pattern(
         "failed login for user 'root'",
         "An attempt to log in as the root user failed, which is a common indicator of a brute-force attack or unauthorized access attempt. The root user has the highest privileges, making this a critical security event."
@@ -62,9 +42,6 @@ if 'vector_db' not in st.session_state:
 
 # --- Gemini API Call Function ---
 def generate_explanation(log_entry, anomaly_reason):
-    """
-    Sends the log entry and anomaly reason to the Gemini API to get a plausible explanation.
-    """
     prompt = (
         f"Act as a cybersecurity analyst. Analyze the following log anomaly and provide a concise, plausible explanation "
         f"for why this event is anomalous and what the potential security implication is. "
@@ -72,26 +49,15 @@ def generate_explanation(log_entry, anomaly_reason):
         f"Reason for anomaly: {anomaly_reason}"
     )
 
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-    }
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
 
-    # The API key is provided by the canvas environment.
-    api_key = ""
-    # In a real-world scenario, you would handle the API key more securely.
-    # The canvas environment automatically provides the key.
-    
-    headers = {
-        "Content-Type": "application/json",
-        "x-goog-api-key": api_key, # Add the API key to the headers
-    }
+    api_key = ""  # Set your API key here or via environment
+    headers = {"Content-Type": "application/json", "x-goog-api-key": api_key}
 
     try:
         response = requests.post(API_URL, headers=headers, json=payload)
-        response.raise_for_status()  # Raises an HTTPError for bad responses (4xx or 5xx)
+        response.raise_for_status()
         result = response.json()
-        
-        # Safely access the generated content
         if 'candidates' in result and result['candidates']:
             candidate = result['candidates'][0]
             if 'content' in candidate and 'parts' in candidate['content']:
@@ -103,6 +69,32 @@ def generate_explanation(log_entry, anomaly_reason):
     except (json.JSONDecodeError, KeyError) as e:
         st.error(f"Error parsing API response: {e}")
         return f"Error: Invalid response from the model API. Details: {e}"
+
+# --- Numeric anomaly detection ---
+def detect_numeric_anomalies(log_line):
+    reasons = []
+    cpu_match = re.search(r"CPU=(\d+)%", log_line)
+    mem_match = re.search(r"Memory=(\d+)%", log_line)
+    packet_match = re.search(r"PacketLoss=(\d+\.?\d*)%", log_line)
+
+    if cpu_match:
+        cpu_val = int(cpu_match.group(1))
+        if cpu_val > 85:
+            reasons.append(f"High CPU usage detected: {cpu_val}% exceeds normal threshold of 85%.")
+
+    if mem_match:
+        mem_val = int(mem_match.group(1))
+        if mem_val > 80:
+            reasons.append(f"High Memory usage detected: {mem_val}% exceeds normal threshold of 80%.")
+
+    if packet_match:
+        packet_val = float(packet_match.group(1))
+        if packet_val > 2.0:
+            reasons.append(f"High Packet Loss detected: {packet_val}% exceeds normal threshold of 2%.")
+
+    if reasons:
+        return " ".join(reasons)
+    return None
 
 # --- Streamlit UI ---
 st.set_page_config(page_title="GenAI Log Intelligence Platform", layout="wide")
@@ -116,7 +108,6 @@ st.markdown(
     """
 )
 
-# Text area for user input
 log_data = st.text_area(
     "Paste your network log entries here (one per line):",
     height=300,
@@ -129,11 +120,8 @@ if st.button("Analyze Logs", use_container_width=True):
     else:
         st.subheader("Analysis Results")
         logs = log_data.strip().split('\n')
-        
-        # Create a container for the results to ensure a clean layout
         results_container = st.container()
 
-        # Iterate through each log entry and analyze
         with results_container:
             for log_line in logs:
                 if not log_line.strip():
@@ -141,28 +129,32 @@ if st.button("Analyze Logs", use_container_width=True):
 
                 is_anomalous = False
                 anomaly_reason = None
-                
-                # Check for a simple known anomaly pattern
+
+                # Check known patterns
                 found_context = st.session_state.vector_db.find_similar(log_line)
-                
                 if found_context:
                     is_anomalous = True
                     anomaly_reason = found_context
-                
-                # In a real system, more advanced anomaly detection would happen here.
-                # For this demo, let's also check for a keyword-based anomaly
+
+                # Keyword-based detection
                 elif "CRIT]" in log_line or "unusual" in log_line:
                     is_anomalous = True
                     anomaly_reason = "The log entry contains a keyword ('CRIT]' or 'unusual') that suggests a critical or anomalous event."
 
-                # Display the result
+                # Numeric anomaly detection
+                numeric_reason = detect_numeric_anomalies(log_line)
+                if numeric_reason:
+                    is_anomalous = True
+                    if anomaly_reason:
+                        anomaly_reason += " " + numeric_reason
+                    else:
+                        anomaly_reason = numeric_reason
+
                 with st.expander(f"Log: {log_line}", expanded=is_anomalous):
                     if is_anomalous:
                         st.markdown(f"<span style='color:red;'>**Anomalous Event Detected!**</span>", unsafe_allow_html=True)
                         st.info(f"**Reason:** {anomaly_reason}")
-                        
                         st.markdown("**Generating explanation with Gemini...**")
-                        # Use a spinner for a better user experience
                         with st.spinner("Asking the model for a plausible explanation..."):
                             explanation = generate_explanation(log_line, anomaly_reason)
                             st.markdown(explanation)
