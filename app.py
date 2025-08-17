@@ -3,6 +3,12 @@ import requests
 import json
 import uuid
 import re
+from dotenv import load_dotenv
+import os
+
+# --- Load environment variables ---
+load_dotenv()
+api_key = os.getenv("GENAI_API_KEY")  # API key for Gemini
 
 # --- Application Configuration ---
 MODEL_NAME = "gemini-2.0-flash"
@@ -51,7 +57,6 @@ def generate_explanation(log_entry, anomaly_reason):
 
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
 
-    api_key = ""  # Set your API key here or via environment
     headers = {"Content-Type": "application/json", "x-goog-api-key": api_key}
 
     try:
