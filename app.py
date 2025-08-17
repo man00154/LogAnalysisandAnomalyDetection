@@ -5,7 +5,8 @@ import uuid
 
 # --- Application Configuration ---
 # Use the model name specified by the user.
-MODEL_NAME = "gemini-2.0-flash-lite"
+# The `gemini-2.0-flash` model is an example of a valid model.
+MODEL_NAME = "gemini-2.0-flash"
 API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL_NAME}:generateContent"
 
 # A very simple, in-memory vector store simulation.
@@ -77,12 +78,12 @@ def generate_explanation(log_entry, anomaly_reason):
 
     # The API key is provided by the canvas environment.
     api_key = ""
-    if not api_key:
-        st.error("API key is not available. Please ensure the app is running in a canvas environment with a valid API key.")
-        return "Error: API key not configured."
-
+    # In a real-world scenario, you would handle the API key more securely.
+    # The canvas environment automatically provides the key.
+    
     headers = {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "x-goog-api-key": api_key, # Add the API key to the headers
     }
 
     try:
@@ -167,4 +168,3 @@ if st.button("Analyze Logs", use_container_width=True):
                             st.markdown(explanation)
                     else:
                         st.markdown("This log entry appears to be **normal**.", unsafe_allow_html=True)
-
