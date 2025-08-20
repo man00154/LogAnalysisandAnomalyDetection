@@ -24,9 +24,10 @@ class SimpleVectorDB:
         self.db[pattern_id] = {"pattern": pattern, "context": explanation_context}
         return pattern_id
 
+    # ✅ FIX: Use regex/substring matching instead of strict in
     def find_similar(self, new_pattern, threshold=0.8):
         for pattern_id, data in self.db.items():
-            if data["pattern"] in new_pattern:
+            if re.search(re.escape(data["pattern"]), new_pattern, re.IGNORECASE):
                 return data["context"]
         return None
 
@@ -146,9 +147,9 @@ if st.button("Analyze Logs", use_container_width=True):
                     anomaly_reason = found_context
 
                 # Keyword-based detection
-                elif "CRIT]" in log_line or "unusual" in log_line:
+                elif re.search(r"\b(CRIT|unusual|ERROR|FAIL)\b", log_line, re.IGNORECASE):
                     is_anomalous = True
-                    anomaly_reason = "The log entry contains a keyword ('CRIT]' or 'unusual') that suggests a critical or anomalous event."
+                    anomaly_reason = "The log entry contains critical/anomalous keywords."
 
                 # Numeric anomaly detection
                 numeric_reason = detect_numeric_anomalies(log_line)
