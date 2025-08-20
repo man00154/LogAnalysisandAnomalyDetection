@@ -141,29 +141,4 @@ if st.button("Analyze Logs", use_container_width=True):
                 found_context = st.session_state.vector_db.find_similar(log_line)
                 if found_context:
                     is_anomalous = True
-                    anomaly_reason = found_context
-
-                # Keyword-based detection
-                elif "CRIT]" in log_line or "unusual" in log_line:
-                    is_anomalous = True
-                    anomaly_reason = "The log entry contains a keyword ('CRIT]' or 'unusual') that suggests a critical or anomalous event."
-
-                # Numeric anomaly detection
-                numeric_reason = detect_numeric_anomalies(log_line)
-                if numeric_reason:
-                    is_anomalous = True
-                    if anomaly_reason:
-                        anomaly_reason += " " + numeric_reason
-                    else:
-                        anomaly_reason = numeric_reason
-
-                with st.expander(f"Log: {log_line}", expanded=is_anomalous):
-                    if is_anomalous:
-                        st.markdown("<span style='color:red;'>**Anomalous Event Detected!**</span>", unsafe_allow_html=True)
-                        st.info(f"**Reason:** {anomaly_reason}")
-                        st.markdown("**Generating explanation with Gemini...**")
-                        with st.spinner("Asking the model for a plausible explanation..."):
-                            explanation = generate_explanation(log_line, anomaly_reason)
-                            st.markdown(explanation)
-                    else:
-                        st.markdown("This log entry appears to be **normal**.", unsafe_allow_html=True)
+                    anomaly_rea_
