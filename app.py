@@ -24,7 +24,11 @@ class SimpleVectorDB:
         self.db[pattern_id] = {"pattern": pattern, "context": explanation_context}
         return pattern_id
 
-    def find_similar(self, new_pattern, threshold=0.8):
+    def find_similar(self, new_pattern):
+        """
+        Finds a predefined pattern that is a substring of the new_pattern.
+        This simulates a simple, in-memory keyword-based vector search.
+        """
         for pattern_id, data in self.db.items():
             if data["pattern"] in new_pattern:
                 return data["context"]
@@ -48,6 +52,9 @@ if 'vector_db' not in st.session_state:
 
 # --- Gemini API Call Function ---
 def generate_explanation(log_entry, anomaly_reason):
+    if not api_key:
+        return "API key not found. Please set the GENAI_API_KEY environment variable."
+
     prompt = (
         f"Act as a cybersecurity analyst. Analyze the following log anomaly and provide a concise, plausible explanation "
         f"for why this event is anomalous and what the potential security implication is. "
@@ -120,7 +127,9 @@ log_data = st.text_area(
 )
 
 if st.button("Analyze Logs", use_container_width=True):
-    if not log_data:
+    if not api_key:
+        st.error("API key not found. Please set the GENAI_API_KEY environment variable.")
+    elif not log_data:
         st.warning("Please paste some log data to analyze.")
     else:
         st.subheader("Analysis Results")
