@@ -50,7 +50,7 @@ if 'vector_db' not in st.session_state:
 # --- Gemini API Call Function ---
 def generate_explanation(log_entry, anomaly_reason):
     prompt = (
-        f"Act as a cybersecurity analyst. Analyze the following log anomaly and provide a concise, plausible explanation "
+        f"Act as a very very deep knowledge expert network security andcybersecurity analyst. Analyze the following log anomaly and provide a concise, plausible explanation "
         f"for why this event is anomalous and what the potential security implication is.\n\n"
         f"Log entry: {log_entry}\n"
         f"Reason for anomaly: {anomaly_reason}"
